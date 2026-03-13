@@ -1,5 +1,20 @@
 export type BallType = 'standard' | 'tennis' | 'football' | 'soccer'
 
+type BallDrawer = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+) => void
+
+const BALL_RENDERERS: Record<BallType, BallDrawer> = {
+  standard: (ctx, x, y, radius) =>
+    drawStandardBall(ctx, x, y, radius, '#ffffff'),
+  tennis: drawTennisBall,
+  football: drawFootballBall,
+  soccer: drawSoccerBall,
+}
+
 export function drawBall(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -12,19 +27,7 @@ export function drawBall(
     drawStandardBall(ctx, x, y, radius, '#ff6600')
     return
   }
-  if (type === 'tennis') {
-    drawTennisBall(ctx, x, y, radius)
-    return
-  }
-  if (type === 'football') {
-    drawFootballBall(ctx, x, y, radius)
-    return
-  }
-  if (type === 'soccer') {
-    drawSoccerBall(ctx, x, y, radius)
-    return
-  }
-  drawStandardBall(ctx, x, y, radius, '#ffffff')
+  BALL_RENDERERS[type](ctx, x, y, radius)
 }
 
 function drawStandardBall(
