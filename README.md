@@ -2,6 +2,8 @@
 
 A browser-based clone of the classic DX-Ball (Breakout/Arkanoid) game. Control a paddle to bounce a ball and destroy bricks across 20 hand-crafted levels. Power-ups drop from destroyed bricks. Modern neon visual style on a dark gradient background.
 
+![DX Ball screenshot](screenshot-game.png)
+
 ## Gameplay
 
 - **Paddle:** mouse or arrow keys
