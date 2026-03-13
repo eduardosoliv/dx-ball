@@ -1,5 +1,9 @@
 export type BallType = 'standard' | 'tennis' | 'football' | 'soccer'
 
+function range(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => i)
+}
+
 type BallDrawer = (
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -95,25 +99,25 @@ function drawSoccerBall(
   // Central pentagon
   ctx.beginPath()
   const pentR = radius * 0.35
-  for (let i = 0; i < 5; i++) {
+  range(5).forEach((i) => {
     const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2
     const px = x + pentR * Math.cos(angle)
     const py = y + pentR * Math.sin(angle)
     if (i === 0) ctx.moveTo(px, py)
     else ctx.lineTo(px, py)
-  }
+  })
   ctx.closePath()
   ctx.fill()
 
   // 5 black patches around perimeter
-  for (let i = 0; i < 5; i++) {
+  range(5).forEach((i) => {
     const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2
     const px = x + radius * 0.65 * Math.cos(angle)
     const py = y + radius * 0.65 * Math.sin(angle)
     ctx.beginPath()
     ctx.arc(px, py, radius * 0.2, 0, Math.PI * 2)
     ctx.fill()
-  }
+  })
 
   ctx.restore()
 }
@@ -146,13 +150,13 @@ function drawFootballBall(
   ctx.lineWidth = 1.5
   const stitchHalf = (radius * 0.35) / 2
   const spacing = (radius * 1.2) / 4
-  for (let i = 0; i < 5; i++) {
+  range(5).forEach((i) => {
     const sx = x - radius * 0.6 + i * spacing
     ctx.beginPath()
     ctx.moveTo(sx, y - stitchHalf)
     ctx.lineTo(sx, y + stitchHalf)
     ctx.stroke()
-  }
+  })
 
   ctx.restore()
 }
