@@ -162,41 +162,6 @@ export class GameEngine {
     return this.ballLaunched
   }
 
-  // --- Test helpers ---
-  _forceBallPosition(x: number, y: number) {
-    const orig = this.balls.find((b) => b.isOriginal)
-    if (orig) {
-      orig.x = x
-      orig.y = y
-    }
-  }
-
-  _addExtraBall() {
-    if (this.balls.length < MAX_BALLS) {
-      const orig = this.balls.find((b) => b.isOriginal)!
-      this.balls.push({ ...orig, isOriginal: false, x: orig.x + 10 })
-    }
-  }
-
-  _forceExtraBallsBelow() {
-    this.balls
-      .filter((b) => !b.isOriginal)
-      .forEach((b) => {
-        b.y = GAME_HEIGHT + 100
-      })
-  }
-
-  _tick(deltaMs: number) {
-    this.update(deltaMs / 1000)
-    this.draw()
-  }
-
-  _clearAllDestructibleBricks() {
-    this.bricks.forEach((b) => {
-      if (b.type !== 'indestructible') b.destroyed = true
-    })
-  }
-
   // --- Input ---
   setMouseX(canvasX: number) {
     this.mouseX = canvasX

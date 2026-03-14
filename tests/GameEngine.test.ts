@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GameEngine } from '../src/engine/GameEngine'
 import type { GameState } from '../src/engine/types'
-import { GAME_WIDTH, PADDLE_WIDTH } from '../src/engine/types'
+import { GAME_HEIGHT, GAME_WIDTH, PADDLE_WIDTH } from '../src/engine/types'
 
 function makeCanvas() {
   const ctx = {
@@ -29,6 +29,11 @@ function makeCanvas() {
     canvas: { width: 640, height: 480 },
   } as unknown as CanvasRenderingContext2D
   return ctx
+}
+
+function tick(engine: GameEngine, deltaMs: number) {
+  engine['update'](deltaMs / 1000)
+  engine['draw']()
 }
 
 describe('GameEngine', () => {
@@ -65,25 +70,34 @@ describe('GameEngine', () => {
 
   it('losing original ball decrements lives', () => {
     engine.launch()
-    engine._forceBallPosition(320, 9999)
-    engine._tick(16)
+    const orig = engine['balls'].find((b: any) => b.isOriginal)!
+    orig.x = 320
+    orig.y = 9999
+    tick(engine, 16)
     expect(engine.getState().lives).toBe(2)
   })
 
   it('losing extra ball does not decrement lives', () => {
     engine.launch()
-    engine._addExtraBall()
+    const origBall = engine['balls'].find((b: any) => b.isOriginal)!
+    engine['balls'].push({ ...origBall, isOriginal: false, x: origBall.x + 10 })
     const before = engine.getState().lives
-    engine._forceExtraBallsBelow()
-    engine._tick(16)
+    engine['balls']
+      .filter((b: any) => !b.isOriginal)
+      .forEach((b: any) => {
+        b.y = GAME_HEIGHT + 100
+      })
+    tick(engine, 16)
     expect(engine.getState().lives).toBe(before)
   })
 
   it('game over when lives reach 0', () => {
     engine['state'].lives = 1
     engine.launch()
-    engine._forceBallPosition(320, 9999)
-    engine._tick(16)
+    const orig = engine['balls'].find((b: any) => b.isOriginal)!
+    orig.x = 320
+    orig.y = 9999
+    tick(engine, 16)
     expect(engine.getState().lives).toBe(0)
     expect(onStateChange).toHaveBeenCalledWith(
       expect.objectContaining({ lives: 0 }),
@@ -91,9 +105,11 @@ describe('GameEngine', () => {
   })
 
   it('destroying all bricks increments level', () => {
-    engine._clearAllDestructibleBricks()
+    engine['bricks'].forEach((b: any) => {
+      if (b.type !== 'indestructible') b.destroyed = true
+    })
     engine.launch()
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getState().level).toBe(2)
   })
 
@@ -112,20 +128,23 @@ describe('GameEngine', () => {
       },
     ]
     engine.launch()
-    engine._forceBallPosition(320, 240 + 8 + 1) // just below brick
-    // force vy upward so ball hits brick
     const orig = engine['balls'].find((b: any) => b.isOriginal)!
+    orig.x = 320
+    orig.y = 240 + 8 + 1 // just below brick
+    // force vy upward so ball hits brick
     orig.vy = -300
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getState().score).toBeGreaterThanOrEqual(10)
   })
 
   it('loops back to level 1 with increased loopMultiplier after level 20', () => {
     engine['state'].level = 20
     const loopBefore = engine.getState().loopMultiplier
-    engine._clearAllDestructibleBricks()
+    engine['bricks'].forEach((b: any) => {
+      if (b.type !== 'indestructible') b.destroyed = true
+    })
     engine.launch()
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getState().level).toBe(1)
     expect(engine.getState().loopMultiplier).toBeCloseTo(loopBefore + 0.2, 5)
   })
@@ -136,7 +155,7 @@ describe('GameEngine', () => {
     engine['fallingPowerUps'] = [
       { kind: 'widePaddle' as const, x: 320, y: 440, width: 20, height: 12 },
     ]
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getPaddle().width).toBeGreaterThan(baseWidth)
   })
 
@@ -145,7 +164,7 @@ describe('GameEngine', () => {
     engine['fallingPowerUps'] = [
       { kind: 'extraLife' as const, x: 320, y: 440, width: 20, height: 12 },
     ]
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getState().lives).toBe(before + 1)
   })
 
@@ -153,7 +172,7 @@ describe('GameEngine', () => {
     engine['fallingPowerUps'] = [
       { kind: 'fireball' as const, x: 320, y: 440, width: 20, height: 12 },
     ]
-    engine._tick(16)
+    tick(engine, 16)
     expect(
       engine['activePowerUps'].some((p: any) => p.kind === 'fireball'),
     ).toBe(true)
@@ -179,9 +198,11 @@ describe('GameEngine', () => {
 
   it('advanceLevel setTimeout clears transitioning flag', () => {
     vi.useFakeTimers()
-    engine._clearAllDestructibleBricks()
+    engine['bricks'].forEach((b: any) => {
+      if (b.type !== 'indestructible') b.destroyed = true
+    })
     engine.launch()
-    engine._tick(16) // triggers advanceLevel, sets transitioning=true
+    tick(engine, 16) // triggers advanceLevel, sets transitioning=true
     expect(engine['transitioning']).toBe(true)
     vi.runAllTimers()
     expect(engine['transitioning']).toBe(false)
@@ -236,10 +257,11 @@ describe('GameEngine', () => {
     ]
     engine.launch()
     const orig = engine['balls'].find((b: any) => b.isOriginal)!
-    engine._forceBallPosition(320, 240 + 8 + 1)
+    orig.x = 320
+    orig.y = 240 + 8 + 1
     orig.vy = -300
     vi.spyOn(Math, 'random').mockReturnValue(0) // 0 < 0.2 → power-up always drops
-    engine._tick(16)
+    tick(engine, 16)
     vi.restoreAllMocks()
     expect(engine['fallingPowerUps'].length).toBeGreaterThan(0)
   })
@@ -247,16 +269,17 @@ describe('GameEngine', () => {
   it('setMouseX moves paddle to match mouse position on next tick', () => {
     const initialX = engine.getPaddle().x
     engine.setMouseX(450) // right of center
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getPaddle().x).toBeGreaterThan(initialX)
   })
 
   it('ball bounces off paddle reversing vy', () => {
     engine.launch()
     const orig = engine['balls'].find((b: any) => b.isOriginal)!
-    engine._forceBallPosition(320, 430)
+    orig.x = 320
+    orig.y = 430
     orig.vy = 300 // moving downward toward paddle at y=440
-    engine._tick(16)
+    tick(engine, 16)
     expect(orig.vy).toBeLessThan(0) // bounced upward
   })
 
@@ -266,7 +289,7 @@ describe('GameEngine', () => {
     engine['fallingPowerUps'] = [
       { kind: 'multiBall' as const, x: 320, y: 440, width: 20, height: 12 },
     ]
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine['balls'].length).toBeGreaterThan(before)
   })
 
@@ -287,16 +310,18 @@ describe('GameEngine', () => {
     const orig = engine['balls'].find((b: any) => b.isOriginal)!
 
     // First hit
-    engine._forceBallPosition(320, 200 + 8 + 1) // just below brick bottom edge
+    orig.x = 320
+    orig.y = 200 + 8 + 1 // just below brick bottom edge
     orig.vy = -300
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getState().score).toBeGreaterThanOrEqual(10)
     expect(brick.hitsRemaining).toBe(1)
 
     // Second hit – reposition below brick and force upward again
-    engine._forceBallPosition(320, 200 + 8 + 1)
+    orig.x = 320
+    orig.y = 200 + 8 + 1
     orig.vy = -300
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getState().score).toBeGreaterThanOrEqual(20)
     expect(brick.hitsRemaining).toBe(0)
     expect(brick.destroyed).toBe(true)
@@ -320,7 +345,7 @@ describe('ArrowRight key', () => {
     const engine = new GameEngine(ctx, vi.fn())
     const before = engine.getPaddle().x
     engine.setKey('ArrowRight', true)
-    engine._tick(100)
+    tick(engine, 100)
     expect(engine.getPaddle().x).toBeGreaterThan(before)
   })
 })
@@ -388,7 +413,7 @@ describe('setKey', () => {
     engine.setKey('ArrowLeft', true)
     // Verify keyboard now moves paddle (mouse was cleared): tick and check paddle moved left
     const before = engine.getPaddle().x
-    engine._tick(100)
+    tick(engine, 100)
     expect(engine.getPaddle().x).toBeLessThan(before)
   })
 
@@ -398,7 +423,7 @@ describe('setKey', () => {
     engine.setMouseX(400)
     engine.setKey('ArrowLeft', false)
     // Mouse should still be in control — tick moves paddle toward mouseX
-    engine._tick(16)
+    tick(engine, 16)
     expect(engine.getPaddle().x).toBeGreaterThan(0)
   })
 })
@@ -421,8 +446,10 @@ describe('ball type', () => {
     const ctx = makeCanvas()
     const engine = new GameEngine(ctx, vi.fn())
     engine.setBallType('football')
-    engine._forceBallPosition(320, 600)
-    engine._tick(16)
+    const orig = engine['balls'].find((b: any) => b.isOriginal)!
+    orig.x = 320
+    orig.y = 600
+    tick(engine, 16)
     expect(engine.getBallType()).toBe('football')
   })
 
@@ -431,7 +458,7 @@ describe('ball type', () => {
     const engine = new GameEngine(ctx, vi.fn())
     engine.setBallType('tennis')
     engine.launch()
-    engine._tick(16)
+    tick(engine, 16)
     expect(ctx.arc).toHaveBeenCalled()
   })
 })
@@ -478,7 +505,7 @@ describe('drawBricks unknown type fallback', () => {
         height: 16,
       },
     ]
-    expect(() => engine._tick(16)).not.toThrow()
+    expect(() => tick(engine, 16)).not.toThrow()
     expect(ctx.fillRect).toHaveBeenCalled()
   })
 })
@@ -489,10 +516,11 @@ describe('wall and ceiling bounces', () => {
     const engine = new GameEngine(ctx, vi.fn())
     engine.launch()
     const ball = engine['balls'].find((b: any) => b.isOriginal)!
-    engine._forceBallPosition(5, 200)
+    ball.x = 5
+    ball.y = 200
     ball.vx = -300
     ball.vy = 0
-    engine._tick(16)
+    tick(engine, 16)
     expect(ball.vx).toBeGreaterThan(0)
   })
 
@@ -501,10 +529,11 @@ describe('wall and ceiling bounces', () => {
     const engine = new GameEngine(ctx, vi.fn())
     engine.launch()
     const ball = engine['balls'].find((b: any) => b.isOriginal)!
-    engine._forceBallPosition(GAME_WIDTH - 5, 200)
+    ball.x = GAME_WIDTH - 5
+    ball.y = 200
     ball.vx = 300
     ball.vy = 0
-    engine._tick(16)
+    tick(engine, 16)
     expect(ball.vx).toBeLessThan(0)
   })
 
@@ -513,10 +542,11 @@ describe('wall and ceiling bounces', () => {
     const engine = new GameEngine(ctx, vi.fn())
     engine.launch()
     const ball = engine['balls'].find((b: any) => b.isOriginal)!
-    engine._forceBallPosition(320, 5)
+    ball.x = 320
+    ball.y = 5
     ball.vx = 0
     ball.vy = -300
-    engine._tick(16)
+    tick(engine, 16)
     expect(ball.vy).toBeGreaterThan(0)
   })
 })
@@ -540,11 +570,12 @@ describe('brick x-axis hit', () => {
     engine.launch()
     const ball = engine['balls'].find((b: any) => b.isOriginal)!
     // Position ball to the left of the brick, moving right — x-axis collision
-    engine._forceBallPosition(300 - ball.radius - 1, 208)
+    ball.x = 300 - ball.radius - 1
+    ball.y = 208
     ball.vx = 300
     ball.vy = 0
     const prevVx = ball.vx
-    engine._tick(16)
+    tick(engine, 16)
     expect(ball.vx).toBeLessThan(prevVx)
   })
 })
@@ -560,7 +591,7 @@ describe('checkLevelComplete while transitioning', () => {
     })
     engine.launch()
     const level = engine.getState().level
-    engine._tick(16)
+    tick(engine, 16)
     // Level should NOT have advanced because transitioning was true
     expect(engine.getState().level).toBe(level)
   })
